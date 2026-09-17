@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: task-manager
+  profiles:
+    default: dev
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        # reports compare completedAt against UTC bounds; the driver must not shift timestamps
+        jdbc:
+          time_zone: UTC
+        format_sql: true
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration-minutes: ${JWT_EXPIRATION_MINUTES:120}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:taskmanager}?serverTimezone=UTC
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:mysql}:${MYSQL_PORT:3306}/${MYSQL_DATABASE}?serverTimezone=UTC
+    username: ${MYSQL_USER}
+    password: ${MYSQL_PASSWORD}
