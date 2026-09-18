@@ -5,7 +5,7 @@ import { LoginPage } from './features/auth/LoginPage'
 import { RegisterPage } from './features/auth/RegisterPage'
 import { ChartPreview } from './features/preview/ChartPreview'
 import { PreviewPage } from './features/preview/PreviewPage'
-import { ReportsPlaceholder } from './features/reports/ReportsPlaceholder'
+import { ReportsPage } from './features/reports/ReportsPage'
 import { TaskListPage } from './features/tasks/TaskListPage'
 
 export default function App() {
@@ -16,7 +16,7 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="/tasks" element={<TaskListPage />} />
-          <Route path="/reports" element={<ReportsPlaceholder />} />
+          <Route path="/reports" element={<ReportsPage />} />
           {import.meta.env.DEV ? (
             <>
               <Route path="/preview" element={<PreviewPage />} />
