@@ -4,6 +4,8 @@ import { Alert, Button, ConfirmDialog, EmptyState, SkeletonRows } from '../../co
 import { useToast } from '../../components/toast/useToast'
 import type { Task } from '../../types/task'
 import { TaskForm } from './TaskForm'
+import { TaskMatrix } from './TaskMatrix'
+import { ViewToggle } from './ViewToggle'
 import { Pagination } from './Pagination'
 import { TaskCard } from './TaskCard'
 import { TaskFilters } from './TaskFilters'
@@ -13,6 +15,8 @@ import { useTasks } from './useTasks'
 export function TaskListPage() {
   const {
     filters,
+    view,
+    setView,
     page,
     status,
     quadrant,
@@ -67,12 +71,17 @@ export function TaskListPage() {
         <div className="flex flex-col gap-1">
           <h1 className="text-display font-semibold text-ink">Tasks</h1>
           <p className="text-secondary text-muted">
-            Sorted newest first. Filters and search run on the server.
+            {view === 'matrix'
+              ? 'Urgency left to right, importance top to bottom.'
+              : 'Sorted newest first. Filters and search run on the server.'}
           </p>
         </div>
-        <Button variant="accent" onClick={() => setCreating(true)}>
-          + New task
-        </Button>
+        <div className="flex items-center gap-3">
+          <ViewToggle view={view} onChange={setView} />
+          <Button variant="accent" onClick={() => setCreating(true)}>
+            + New task
+          </Button>
+        </div>
       </header>
 
       <TaskFilters
@@ -82,6 +91,7 @@ export function TaskListPage() {
         onSearch={setSearchDraft}
         onStatus={setStatus}
         onQuadrant={setQuadrant}
+        showQuadrants={view === 'list'}
       />
 
       {error ? (
@@ -94,6 +104,11 @@ export function TaskListPage() {
       ) : loading && !result ? (
         <SkeletonRows rows={5} />
       ) : result && result.content.length > 0 ? (
+        view === 'matrix' ? (
+          <div className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
+            <TaskMatrix tasks={result.content} onSelect={setEditing} />
+          </div>
+        ) : (
         <>
           <ul
             className={`flex flex-col gap-2.5 transition-opacity ${loading ? 'opacity-60' : ''}`}
@@ -116,6 +131,7 @@ export function TaskListPage() {
             onPage={setPage}
           />
         </>
+        )
       ) : hasFilters ? (
         <EmptyState
           title="No matching tasks"

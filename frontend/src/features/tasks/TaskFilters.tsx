@@ -9,6 +9,7 @@ interface TaskFiltersProps {
   onSearch: (value: string) => void
   onStatus: (value?: TaskStatus) => void
   onQuadrant: (value?: Quadrant) => void
+  showQuadrants?: boolean
 }
 
 export function TaskFilters({
@@ -18,6 +19,7 @@ export function TaskFilters({
   onSearch,
   onStatus,
   onQuadrant,
+  showQuadrants = true,
 }: TaskFiltersProps) {
   return (
     <div className="flex flex-col gap-3">
@@ -47,6 +49,7 @@ export function TaskFilters({
         </label>
       </div>
 
+      {showQuadrants ? (
       <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
         <Chip label="Any priority" active={!quadrant} onClick={() => onQuadrant(undefined)} />
         {QUADRANTS.map((value) => (
@@ -58,6 +61,7 @@ export function TaskFilters({
           />
         ))}
       </div>
+      ) : null}
     </div>
   )
 }

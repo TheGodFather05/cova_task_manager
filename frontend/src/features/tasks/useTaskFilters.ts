@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import type { Quadrant, TaskFilters, TaskStatus } from '../../types/task'
+import type { TaskView } from './ViewToggle'
 
 const PAGE_SIZE = 10
+// the matrix shows every quadrant at once, so it asks for a larger slice than the list
+const MATRIX_SIZE = 100
 const SEARCH_DEBOUNCE_MS = 300
 
 /**
@@ -13,6 +16,7 @@ export function useTaskFilters() {
   const [params, setParams] = useSearchParams()
   const [searchDraft, setSearchDraft] = useState(() => params.get('search') ?? '')
 
+  const view: TaskView = params.get('view') === 'matrix' ? 'matrix' : 'list'
   const page = Number(params.get('page') ?? '0')
   const status = (params.get('status') as TaskStatus | null) ?? undefined
   const quadrant = (params.get('quadrant') as Quadrant | null) ?? undefined
@@ -64,12 +68,17 @@ export function useTaskFilters() {
   )
 
   const filters = useMemo<TaskFilters>(
-    () => ({ page, size: PAGE_SIZE, status, quadrant, search }),
-    [page, status, quadrant, search],
+    () =>
+      view === 'matrix'
+        ? { page: 0, size: MATRIX_SIZE, status, search }
+        : { page, size: PAGE_SIZE, status, quadrant, search },
+    [view, page, status, quadrant, search],
   )
 
   return {
     filters,
+    view,
+    setView: (value: TaskView) => update({ view: value === 'matrix' ? 'matrix' : undefined }),
     page,
     status,
     quadrant,
