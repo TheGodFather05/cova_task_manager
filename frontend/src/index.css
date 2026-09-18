@@ -1,0 +1,38 @@
+@import 'tailwindcss';
+
+/* Design tokens land in F2; this is the minimum the shell needs to render. */
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --color-ground: #efefeb;
+  --color-surface: #fafaf8;
+  --color-ink: #26383a;
+  --color-primary: #17878a;
+  --color-primary-deep: #0e5f61;
+  --color-accent: #f26a21;
+  --color-muted: #6b7280;
+  --color-line: #e5e7eb;
+}
+
+[data-theme='dark'] {
+  --color-ground: #0f1a1b;
+  --color-surface: #16292a;
+  --color-ink: #e8f1f0;
+  --color-primary: #5fc3c4;
+  --color-primary-deep: #2fa8ab;
+  --color-muted: #9fb1b1;
+  --color-line: #2c4849;
+}
+
+html {
+  background: var(--color-ground);
+}
+
+body {
+  margin: 0;
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}

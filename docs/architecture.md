@@ -38,7 +38,7 @@ traitement particulier, et au service d'être répliqué horizontalement sans se
 |---|---|
 | Backend | Java 21, Spring Boot 3.x, Spring Data JPA, Spring Security, springdoc-openapi |
 | Base de données | MySQL 8 |
-| Frontend web | React 18, Vite, TypeScript, Tailwind CSS |
+| Frontend web | React 19, Vite, TypeScript, Tailwind CSS 4 |
 | Mobile | Flutter / Dart (bonus) |
 | Conteneurisation | Docker, Docker Compose |
 | CI/CD | GitHub Actions |
