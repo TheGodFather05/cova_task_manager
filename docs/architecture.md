@@ -133,7 +133,8 @@ Découpage **par domaine**, pas par type technique.
 ```
 com.taskmanager/
 ├── config/          SecurityConfig, OpenApiConfig, JpaAuditingConfig
-├── security/        JwtService, JwtAuthenticationFilter, CustomUserDetailsService
+├── security/        JwtService, JwtAuthenticationFilter, CustomUserDetailsService,
+│                    RefreshToken, RefreshTokenService, RefreshCookie
 ├── user/            User, UserRepository, AuthController, AuthService, dto/
 ├── task/            Task, TaskStatus, Importance, Urgency, Quadrant,
 │                    TaskRepository, TaskController, TaskService, dto/
@@ -164,8 +165,21 @@ d'un bloc.
 JWT signé HS256, transmis en `Authorization: Bearer <token>`. Mots de passe hachés en BCrypt.
 Sessions Spring Security en `STATELESS`.
 
-Un seul access token, sans refresh token. La durée de vie courte suffit au périmètre du projet ;
-un mécanisme de refresh serait la première évolution en contexte de production.
+**Access token court (15 min) + refresh token rotatif (30 jours).** L'access token porte
+l'authentification des appels ; le refresh token sert uniquement à en obtenir un nouveau.
+
+Le refresh token transite par un cookie `httpOnly`, `SameSite=Strict`, `Path=/api/auth` : il est
+inaccessible au JavaScript, donc une XSS n'emporte que l'access token court-vivant. Il est
+stocké en base sous forme d'empreinte SHA-256, jamais en clair.
+
+Chaque usage le consomme et en émet un nouveau (rotation). Présenter un jeton **déjà consommé**
+trahit l'existence d'une copie : le serveur révoque alors toute la famille de rotation, y
+compris le jeton courant du porteur légitime — on ne peut pas distinguer la victime de
+l'attaquant, donc on coupe les deux.
+
+Le stockage en base est ce qui rend la révocation et la détection de rejeu possibles. Un refresh
+*stateless* éviterait la table mais rendrait le logout purement cosmétique et le vol
+indétectable.
 
 Chaîne de filtres : `JwtAuthenticationFilter` placé avant
 `UsernamePasswordAuthenticationFilter`, extrait le sujet du jeton, charge l'utilisateur et
@@ -193,10 +207,16 @@ confirmerait l'existence de la ressource et permettrait d'énumérer les identif
 
 ### Stockage du jeton côté client
 
-`localStorage` côté web. Choix assumé, avec sa limite : vulnérable au XSS. Un cookie `httpOnly`
-+ `SameSite=Strict` supprimerait ce risque mais imposerait une protection CSRF et une gestion
-de domaine incompatible avec le mode de développement Vite. En production, le cookie `httpOnly`
-serait le choix retenu.
+Les deux jetons ne sont pas stockés de la même façon, parce qu'ils n'ont pas la même valeur.
+
+**Access token en `localStorage`.** Vulnérable au XSS, limite assumée — mais il expire en
+15 minutes, donc le butin est faible et périssable.
+
+**Refresh token en cookie `httpOnly`**, `SameSite=Strict`, `Path=/api/auth`. C'est lui qui vaut
+30 jours d'accès, donc c'est lui qu'on met hors de portée du JavaScript. Le `Path` limite son
+envoi aux routes d'authentification, réduisant d'autant la surface CSRF ; `SameSite=Strict`
+couvre le reste. Le frontend étant servi en même origine que l'API (proxy Vite en dev, nginx en
+production), le cookie fonctionne sans configuration CORS.
 
 Côté Flutter, stockage sécurisé natif (`flutter_secure_storage`).
 
@@ -212,6 +232,8 @@ Base : `/api`.
 |---|---|---|
 | POST | `/api/auth/register` | Inscription |
 | POST | `/api/auth/login` | Connexion, renvoie le JWT |
+| POST | `/api/auth/refresh` | Rotation du refresh token |
+| POST | `/api/auth/logout` | Révocation de la famille de jetons |
 | GET | `/api/tasks` | Liste paginée, filtrée, recherchée |
 | POST | `/api/tasks` | Création |
 | GET | `/api/tasks/{id}` | Détail |
@@ -345,14 +367,16 @@ GitHub Actions, trois jobs :
 | 404 sur ressource étrangère | 403 | Ne révèle pas l'existence de la ressource |
 | Filtrage et agrégation en base | Côté client | Ne tient pas à l'échelle |
 | Séries complétées côté serveur | Complétées par le client | Évite de dupliquer la logique par client |
-| `localStorage` | Cookie `httpOnly` | Compromis assumé ; cookie en production |
-| Access token seul | Refresh token | Hors périmètre ; première évolution |
+| `localStorage` pour l'access token | Cookie `httpOnly` | Compromis assumé ; jeton court-vivant |
+| Refresh en cookie `httpOnly` | Refresh en `localStorage` | Inaccessible au JavaScript, donc hors de portée d'une XSS |
+| Refresh stocké en base | Refresh *stateless* signé | Rend la révocation et la détection de rejeu possibles |
+| Rotation + révocation de famille | Jeton réutilisable | Un rejeu trahit une copie ; on coupe toute la lignée |
 | Grille 2×2 de saisie | Deux listes déroulantes | Rend l'état invalide inatteignable |
 
 ---
 
 ## 10. Hors périmètre
 
-Non implémenté, et assumé comme tel : refresh token, rôles et permissions, partage de tâches
+Non implémenté, et assumé comme tel : rôles et permissions, partage de tâches
 entre utilisateurs, notifications, pièces jointes, tâches récurrentes, corbeille, export des
 rapports côté serveur, internationalisation.

@@ -65,7 +65,9 @@ refuse de démarrer sans lui, et rejette une clé de moins de 32 octets (minimum
 | Variable | Requis | Défaut | Rôle |
 |---|---|---|---|
 | `JWT_SECRET` | oui | — | Clé de signature HS256, 32 octets minimum |
-| `JWT_EXPIRATION_MINUTES` | non | `120` | Durée de vie du jeton |
+| `JWT_EXPIRATION_MINUTES` | non | `15` | Durée de vie de l'access token |
+| `JWT_REFRESH_DAYS` | non | `30` | Durée de vie du refresh token |
+| `JWT_REFRESH_COOKIE_SECURE` | non | `false` | `true` en production (HTTPS) |
 | `MYSQL_DATABASE` | oui | `taskmanager` (dev) | Nom de la base |
 | `MYSQL_USER` | oui | `root` (dev) | Utilisateur |
 | `MYSQL_PASSWORD` | oui | — | Mot de passe |
@@ -89,6 +91,8 @@ Base : `/api`. Toutes les routes sauf `/api/auth/**` exigent un en-tête
 |---|---|---|
 | POST | `/api/auth/register` | Inscription, renvoie un JWT |
 | POST | `/api/auth/login` | Connexion, renvoie un JWT |
+| POST | `/api/auth/refresh` | Rotation du refresh token, renvoie un nouvel access token |
+| POST | `/api/auth/logout` | Révoque la famille de jetons et efface le cookie |
 | GET | `/api/tasks` | Liste paginée, filtrée, recherchée |
 | POST | `/api/tasks` | Création |
 | GET | `/api/tasks/{id}` | Détail |
@@ -197,6 +201,39 @@ l'adresse existe.
 L'identité de l'utilisateur courant provient exclusivement du `SecurityContext`, jamais d'un
 paramètre de requête ni d'un champ du corps.
 
+### Refresh token : rotation, détection de rejeu, cookie httpOnly
+
+L'access token vit **15 minutes**, le refresh token **30 jours**. Un access token volé n'est donc
+exploitable que le temps d'une pause café ; c'est le refresh qui a de la valeur, et c'est lui
+qu'on protège.
+
+**Le refresh token ne transite que par un cookie `httpOnly`**, `SameSite=Strict`, `Path=/api/auth`.
+Il n'apparaît jamais dans le corps JSON (`@JsonIgnore` sur le champ), donc **aucun JavaScript ne
+peut le lire** : une faille XSS qui viderait le `localStorage` n'emporterait que l'access token
+court-vivant. Le `Path` restreint l'envoi du cookie aux seules routes d'authentification, ce qui
+réduit d'autant la surface CSRF. `Secure` est activable par variable d'environnement, désactivé
+en développement pour fonctionner en HTTP sur `localhost`.
+
+**Rien n'est stocké en clair.** La table `refresh_tokens` ne contient qu'une empreinte SHA-256,
+au même titre qu'un mot de passe : une copie de la base ne permet de rejouer aucune session.
+
+**Rotation à chaque usage.** Chaque appel à `/api/auth/refresh` consomme le jeton présenté et en
+émet un nouveau. Un jeton n'est donc valide qu'une fois.
+
+**Détection de rejeu.** C'est ce que la rotation permet de construire. Si un jeton **déjà
+consommé** est représenté, c'est qu'il en existe une copie : le porteur légitime l'a forcément
+déjà échangé. Le serveur révoque alors **toute la famille** de rotation — y compris le jeton
+courant du porteur légitime. Ce dernier est déconnecté, ce qui est voulu : on ne peut pas
+distinguer la victime de l'attaquant, donc on coupe les deux plutôt que de laisser le voleur
+dans la place.
+
+Le stockage en base est ce qui rend ces trois propriétés vraies. Un refresh token *stateless*
+(un second JWT signé) éviterait la table, mais le serveur ne se souviendrait de rien : la
+révocation au logout serait une politesse côté client, et le rejeu serait indétectable — un
+jeton volé resterait valide jusqu'à son expiration. La table est le prix de la révocabilité.
+
+Un job `@Scheduled` purge chaque nuit les jetons expirés.
+
 ### Filtrage et agrégation côté serveur
 
 La pagination, les filtres et la recherche sont exécutés **en base**, via une `Specification`
@@ -263,6 +300,6 @@ nul) est renvoyée à `null`, jamais à `0`, qui se lirait « stable ».
 
 ## Hors périmètre
 
-Non implémenté et assumé comme tel : refresh token, rôles et permissions, partage de tâches
-entre utilisateurs, notifications, pièces jointes, tâches récurrentes, corbeille, export des
-rapports, internationalisation.
+Non implémenté et assumé comme tel : rôles et permissions, partage de tâches entre utilisateurs,
+notifications, pièces jointes, tâches récurrentes, corbeille, export des rapports,
+internationalisation.
