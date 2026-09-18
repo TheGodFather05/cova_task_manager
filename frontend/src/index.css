@@ -41,6 +41,8 @@
   /* orange appears only where the user is meant to act */
   --color-accent: var(--tm-accent);
   --color-accent-hover: var(--tm-accent-hover);
+  /* accent as text on a surface: the light shade fails contrast in the dark theme */
+  --color-accent-ink: var(--tm-accent-ink);
 
   --color-danger: var(--tm-danger);
   --color-danger-tint: var(--tm-danger-tint);
@@ -75,6 +77,7 @@
 
   --tm-accent: #f26a21;
   --tm-accent-hover: #b4500f;
+  --tm-accent-ink: #b4500f;
 
   --tm-danger: #dc2626;
   --tm-danger-tint: #fee2e2;
@@ -113,6 +116,7 @@
 
   --tm-accent: #f26a21;
   --tm-accent-hover: #ff8a4a;
+  --tm-accent-ink: #f26a21;
 
   --tm-danger: #9b3b3b;
   --tm-danger-tint: #3c1e1e;

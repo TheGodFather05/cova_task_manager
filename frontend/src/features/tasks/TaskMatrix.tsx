@@ -4,7 +4,7 @@ import type { Quadrant, Task } from '../../types/task'
 import { QUADRANT_CELLS } from './quadrant'
 
 const PANEL: Record<Quadrant, { dot: string; tint: string; ink: string }> = {
-  DO_FIRST: { dot: 'bg-do-first', tint: 'bg-accent/10', ink: 'text-accent-hover dark:text-accent' },
+  DO_FIRST: { dot: 'bg-do-first', tint: 'bg-accent/10', ink: 'text-accent-ink' },
   SCHEDULE: { dot: 'bg-schedule', tint: 'bg-primary-tint', ink: 'text-primary-deep' },
   DELEGATE: { dot: 'bg-delegate', tint: 'bg-delegate/12', ink: 'text-delegate' },
   DROP: { dot: 'bg-drop', tint: 'bg-line-soft', ink: 'text-muted' },

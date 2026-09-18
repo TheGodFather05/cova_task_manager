@@ -26,7 +26,7 @@ export function MetricCard({ label, value, suffix = '', delta, deltaSuffix = '',
       <div className="flex items-center gap-2">
         <span
           className={`text-xs font-semibold ${
-            rising ? 'text-primary' : falling ? 'text-accent-hover dark:text-accent' : 'text-muted'
+            rising ? 'text-primary' : falling ? 'text-accent-ink' : 'text-muted'
           }`}
         >
           {formatDelta(delta, deltaSuffix)}

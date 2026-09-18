@@ -1,7 +1,13 @@
-# Task Manager — API REST
+# Task Manager
 
-Backend de gestion de tâches avec classement selon la matrice d'Eisenhower et rapports
-d'activité. API REST stateless authentifiée par JWT.
+Gestion de tâches avec classement selon la matrice d'Eisenhower et rapports d'activité.
+API REST stateless authentifiée par JWT, et interface React qui la consomme.
+
+```
+backend/    API Spring Boot
+frontend/   interface React, servie par nginx en production
+docs/       architecture.md — document de conception
+```
 
 Document de conception détaillé : [`docs/architecture.md`](docs/architecture.md).
 
@@ -9,36 +15,49 @@ Document de conception détaillé : [`docs/architecture.md`](docs/architecture.m
 
 | Couche | Technologie |
 |---|---|
-| Langage | Java 21 |
-| Framework | Spring Boot 3.5.16 |
-| Persistance | Spring Data JPA, MySQL 8 |
+| Backend | Java 21, Spring Boot 3.5.16, Spring Data JPA |
+| Base de données | MySQL 8 |
 | Sécurité | Spring Security, JWT (jjwt 0.13.0), BCrypt |
-| Documentation | springdoc-openapi 2.9.1 |
-| Build | Maven (wrapper versionné) |
-| Conteneurisation | Docker, Docker Compose |
-| Tests | JUnit 5, MockMvc, H2 |
+| Documentation API | springdoc-openapi 2.9.1 |
+| Frontend | React 19, Vite 8, TypeScript, Tailwind CSS 4 |
+| Routage | React Router 7 |
+| Build | Maven (wrapper versionné), npm |
+| Conteneurisation | Docker, Docker Compose, nginx |
+| Tests | JUnit 5, MockMvc, H2 · Vitest |
+
+**Aucune librairie de graphiques** : les cinq visualisations des rapports sont en SVG et CSS
+natifs (voir « Graphiques sans librairie » plus bas).
 
 ## Installation
 
 ### Prérequis
 
 - JDK 21 (le build cible explicitement la version 21)
+- Node 20 ou plus récent
 - Docker et Docker Compose, ou une instance MySQL 8 accessible
 
 Maven n'a pas besoin d'être installé : le wrapper `./mvnw` est versionné dans le dépôt et
-télécharge la version de Maven définie dans `.mvn/wrapper/maven-wrapper.properties`.
+télécharge la version définie dans `.mvn/wrapper/maven-wrapper.properties`.
 
-### Lancement avec Docker
+### Lancement avec Docker — tout d'un coup
 
 ```bash
 cp .env.example .env    # puis renseigner les valeurs
 docker compose up --build
 ```
 
-MySQL démarre avec un healthcheck et un volume persistant ; le backend attend que la base soit
-saine avant de démarrer.
+| Service | URL |
+|---|---|
+| Interface | <http://localhost:3000> |
+| API | <http://localhost:8080/api> |
+| Swagger UI | <http://localhost:8080/swagger-ui.html> |
 
-### Lancement en local
+MySQL démarre avec un healthcheck et un volume persistant ; le backend attend que la base soit
+saine, puis le frontend démarre.
+
+### Lancement en développement
+
+Deux terminaux. Le backend :
 
 ```bash
 export JWT_SECRET='au-moins-32-octets-de-secret-aleatoire'
@@ -46,16 +65,27 @@ export MYSQL_PASSWORD='votre-mot-de-passe'
 cd backend && ./mvnw spring-boot:run
 ```
 
-Le profil `dev` est actif par défaut et se connecte à `localhost:3306`.
+Puis le frontend :
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+L'interface est sur <http://localhost:5173> et Vite proxifie `/api` vers `localhost:8080`.
+Le profil backend `dev` est actif par défaut et se connecte à `localhost:3306`.
 
 ### Tests
 
 ```bash
-cd backend && ./mvnw verify
+cd backend  && ./mvnw verify   # 78 tests
+cd frontend && npm test        # 45 tests
 ```
 
-63 tests : unitaires sur le calcul des périodes, intégration sur les endpoints avec base H2 en
-mémoire.
+Backend : unitaires sur le calcul des périodes et la rotation des jetons, intégration sur les
+endpoints avec base H2 en mémoire.
+Frontend : fonctions pures uniquement — correspondance des quadrants, mathématiques des
+graphiques sur leurs cas dégénérés, analyse des dates. Voir « Ce qui est testé, et pourquoi si
+peu » plus bas.
 
 ## Variables d'environnement
 
@@ -74,7 +104,8 @@ refuse de démarrer sans lui, et rejette une clé de moins de 32 octets (minimum
 | `MYSQL_HOST` | non | `localhost` (dev), `mysql` (docker) | Hôte |
 | `MYSQL_PORT` | non | `3306` | Port |
 | `MYSQL_ROOT_PASSWORD` | oui (docker) | — | Mot de passe root du conteneur |
-| `BACKEND_PORT` | non | `8080` | Port exposé |
+| `BACKEND_PORT` | non | `8080` | Port exposé de l'API |
+| `FRONTEND_PORT` | non | `3000` | Port exposé de l'interface |
 
 ## Documentation de l'API
 
@@ -144,6 +175,30 @@ com.taskmanager/
 Règles transverses : aucune entité JPA exposée dans un controller (DTO en entrée et en sortie),
 logique métier dans les services, gestion des erreurs centralisée dans un
 `@RestControllerAdvice`.
+
+### Frontend
+
+Même principe : découpage par domaine, pas par type de fichier.
+
+```
+src/
+├── api/        client.ts (instance unique + intercepteurs), authApi, taskApi, reportApi,
+│               datetime.ts (analyse UTC)
+├── auth/       AuthContext, useAuth, ProtectedRoute
+├── theme/      ThemeProvider, jetons clair/sombre
+├── components/ ui/ (boutons, champs, badges, modale…), layout/, toast/
+├── features/
+│   ├── auth/    LoginPage, RegisterPage, jauge de mot de passe
+│   ├── tasks/   TaskListPage, TaskCard, TaskForm, QuadrantSelector, TaskMatrix,
+│   │            quadrant.ts (table de correspondance), useTasks, useTaskFilters
+│   ├── reports/ ReportsPage, charts/ (5 graphiques), chartMath.ts, useReports
+│   └── preview/ galerie de composants, développement uniquement
+└── types/      miroir exact des DTO du backend
+```
+
+Les types TypeScript reflètent les records Java : `TaskInput` **n'a aucun champ `quadrant`**,
+et les taux des rapports sont `number | null`. Une divergence de contrat devient une erreur de
+compilation plutôt qu'un bug à l'exécution.
 
 ## Choix techniques
 
@@ -297,6 +352,133 @@ La période courante étant partielle et la précédente complète, la réponse 
 du taux est exprimée en **points de pourcentage** (`completionRatePoints`) : « +25 % » est
 ambigu entre 60→75 et 60→85, « +15 points » ne l'est pas. Une variation indéfinie (dénominateur
 nul) est renvoyée à `null`, jamais à `0`, qui se lirait « stable ».
+
+### La grille 2×2 rend l'état invalide inatteignable
+
+Le backend garantit qu'une paire contradictoire est irreprésentable ; l'interface applique le
+même principe plutôt que de le contredire.
+
+Le sélecteur de priorité est une grille 2×2 — urgence en abscisse, importance en ordonnée — où
+**une cellule *est* un couple `{importance, urgency}`**. Un seul tap écrit les deux axes en une
+opération, donc aucun rendu intermédiaire ne voit un axe renseigné et l'autre vide. Deux listes
+déroulantes séparées auraient permis de composer une saisie que le backend rejette ; la grille
+rend cette saisie impossible à formuler.
+
+Le formulaire n'envoie **jamais** de champ `quadrant` : il n'existe pas sur `TaskInput`, donc le
+chemin d'écriture n'est pas seulement validé — il est absent du type. Le quadrant affiché vient
+de la réponse du serveur.
+
+Une seule table (`quadrant.ts`) porte la correspondance dans les deux sens, et elle est testée
+dans les deux sens : c'est le miroir exact de `Quadrant.java`, et une divergence silencieuse
+mal-étiquetterait toutes les tâches.
+
+### Jetons de design et thème sombre
+
+Toutes les couleurs sont des variables CSS déclarées une fois sur `:root`, redéfinies sous
+`[data-theme="dark"]`. Tailwind les consomme via `@theme`, donc `bg-surface` ou `text-muted`
+deviennent thématiques automatiquement : **le code ne contient aucune variante `dark:`**, et le
+balisage est identique dans les deux thèmes.
+
+Le teal s'éclaircit en sombre (contraste insuffisant sinon) ; l'orange, lui, ne change pas —
+il porte une signification (« agissez ici »), pas une identité.
+
+Un script inline dans `<head>`, exécuté **avant** la feuille de style et le bundle, pose
+`data-theme` depuis `localStorage`. Le thème correct est donc en place à la première peinture :
+pas de flash clair au chargement d'une page sombre.
+
+### Graphiques sans librairie
+
+Les cinq visualisations reprennent les techniques du kit de design plutôt qu'une dépendance :
+
+| Graphique | Technique |
+|---|---|
+| Courbe de tendance | `<svg viewBox="0 0 100 40">` + `polyline` et `polygon` |
+| Donut des tâches ouvertes | `conic-gradient` à bornes cumulées |
+| Barres par quadrant | hauteurs en `%` |
+| Barres par statut | largeurs en `%` |
+| Heatmap annuelle | CSS grid, 7 lignes × 53 colonnes |
+
+Deux détails décident du résultat :
+
+- **`vector-effect="non-scaling-stroke"`** sur la courbe. Avec `preserveAspectRatio="none"`, le
+  trait est étiré par la déformation du viewBox : un segment horizontal ne fait pas la même
+  épaisseur qu'un vertical. Les étiquettes sont en HTML positionné au-dessus du SVG, jamais en
+  `<text>`, pour la même raison.
+- **La hauteur d'une barre est un ratio du maximum, pas le champ `percentage` de l'API.**
+  `percentage` est une part du total : quatre quadrants égaux donneraient quatre quarts de
+  barre. Il sert au libellé, le ratio à la hauteur.
+
+La heatmap complète sa première colonne selon le jour de semaine du 1er janvier ; sans ce
+décalage, toute la grille est pivotée et chaque étiquette de jour est fausse.
+
+### Les cas dégénérés sont traités, pas subis
+
+Un compte neuf produit **tous** les cas limites dès sa première visite : aucune tâche, aucune
+période précédente, donc des dénominateurs nuls partout. Le backend renvoie `null` plutôt que
+`0` lorsqu'un taux est indéfini ; l'interface propage ce `null` jusqu'à l'affichage.
+
+| Cas | Affichage |
+|---|---|
+| Taux indéfini (`null`) | **`—`**, jamais `0 %` — afficher `0 %` affirmerait un fait que l'API a refusé d'énoncer |
+| Variation sans période précédente | `—` |
+| Série entièrement à zéro | Ligne plate au sol, pas de division par zéro |
+| Donut à total nul | Message explicite, **pas** d'anneau plein qui suggérerait une part de 100 % |
+| Année sans activité | « Nothing completed this year yet. » au-dessus de la grille |
+
+`currentPeriodComplete: false` est le cas **normal**, pas l'exception : la période en cours est
+toujours partielle et comparée à une période complète. L'interface le signale au lieu de laisser
+croire à une baisse.
+
+Ces états ont été construits et vérifiés sur une route de prévisualisation réservée au
+développement (`/preview`), avec des fixtures dégénérées, **avant** d'être branchés sur l'API —
+et cette route est retirée du bundle de production.
+
+### Renouvellement de session silencieux
+
+Sur un 401, l'intercepteur tente **une fois** `POST /api/auth/refresh`, rejoue la requête
+d'origine si le renouvellement réussit, et ne redirige vers `/login` que s'il échoue. L'access
+token expire en 15 minutes ; l'utilisateur ne s'en aperçoit pas.
+
+Les appels concurrents pendant un renouvellement sont **mis en file derrière une promesse
+unique**. Sans cela, cinq requêtes simultanées déclencheraient cinq rotations, et la détection
+de rejeu du backend — qui fait son travail — y verrait un vol et révoquerait toute la famille.
+
+Trois garde-fous évitent la boucle de redirection : les 401 de `/api/auth/**` ne sont jamais
+interceptés (un mot de passe faux doit rester une erreur inline), rien ne se déclenche sans
+jeton, et aucune redirection n'a lieu si l'on est déjà sur `/login`.
+
+### Même origine, donc pas de CORS
+
+En développement, Vite proxifie `/api` vers `localhost:8080`. En production, nginx sert les
+fichiers statiques et proxifie `/api` vers le conteneur backend. Dans les deux cas le navigateur
+ne voit qu'une seule origine : le cookie `SameSite=Strict` est envoyé normalement, et
+**la configuration de sécurité du backend n'a pas eu besoin d'être modifiée**.
+
+nginx renvoie `index.html` pour toute route inconnue, afin qu'un lien profond comme `/reports`
+fonctionne au rechargement.
+
+### Ce qui est testé, et pourquoi si peu
+
+45 tests, tous sur des **fonctions pures** : correspondance des quadrants dans les deux sens,
+mathématiques des graphiques (testées d'abord sur leurs entrées dégénérées), analyse des dates,
+formatage des variations. Ces fonctions ont été extraites de leurs composants exprès pour être
+testables sans rendu.
+
+Il n'y a **pas** de tests de rendu ni de tests end-to-end. Sur une interface CRUD au-dessus
+d'une API déjà couverte par 78 tests, ils assureraient surtout que des classes Tailwind existent.
+Le reste a été vérifié à la main contre le vrai backend, à chaque étape : isolation entre
+comptes, charges utiles réseau, cas dégénérés sur compte neuf, thème clair et sombre, et rendu
+à 390 px.
+
+### Écarts assumés avec le kit de design
+
+- **Boutons « Export PDF / CSV » omis.** Le backend n'a pas d'endpoint d'export et le README le
+  classe hors périmètre. Un bouton décoratif est pire que son absence.
+- **« Status funnel » renommé « Tasks by status ».** Les trois comptes sont des ensembles
+  disjoints, pas des étapes successives ; la métaphore de l'entonnoir affirmerait une déperdition
+  entre étapes qui n'existe pas. Même donnée, libellé honnête.
+- **Pas de barre d'onglets en bas en mobile.** Le kit conserve la même barre teal sur les écrans
+  390 px, simplement empilée ; c'est ce qui est implémenté, avec un seul composant qui reflue.
 
 ## Hors périmètre
 
