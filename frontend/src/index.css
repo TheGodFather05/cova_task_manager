@@ -1,28 +1,130 @@
 @import 'tailwindcss';
 
-/* Design tokens land in F2; this is the minimum the shell needs to render. */
+/*
+ * Design tokens from the Taskline UI kit.
+ *
+ * Tailwind 4 applies opacity modifiers (bg-surface/60) with color-mix, so tokens are plain
+ * colours — no rgb-channel indirection needed.
+ *
+ * Only the semantic layer is redefined for dark; the @theme block below declares it once.
+ */
+
 @theme {
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
-  --color-ground: #efefeb;
-  --color-surface: #fafaf8;
-  --color-ink: #26383a;
-  --color-primary: #17878a;
-  --color-primary-deep: #0e5f61;
-  --color-accent: #f26a21;
-  --color-muted: #6b7280;
-  --color-line: #e5e7eb;
+  /* type scale from the kit: display 30/600, heading 20/600, body 15/500, secondary 14/400 */
+  --text-display: 1.875rem;
+  --text-heading: 1.25rem;
+  --text-body: 0.9375rem;
+  --text-secondary: 0.875rem;
+
+  --radius-card: 0.75rem;
+  --radius-control: 0.625rem;
+  --radius-pill: 999px;
+
+  --color-ground: var(--tm-ground);
+  --color-surface: var(--tm-surface);
+  --color-raised: var(--tm-raised);
+  --color-line: var(--tm-line);
+  --color-line-soft: var(--tm-line-soft);
+
+  --color-ink: var(--tm-ink);
+  --color-muted: var(--tm-muted);
+  --color-faint: var(--tm-faint);
+
+  --color-primary: var(--tm-primary);
+  --color-primary-deep: var(--tm-primary-deep);
+  --color-primary-tint: var(--tm-primary-tint);
+  --color-on-primary: var(--tm-on-primary);
+
+  /* orange appears only where the user is meant to act */
+  --color-accent: var(--tm-accent);
+  --color-accent-hover: var(--tm-accent-hover);
+
+  --color-danger: var(--tm-danger);
+  --color-danger-tint: var(--tm-danger-tint);
+
+  --color-do-first: var(--tm-do-first);
+  --color-schedule: var(--tm-schedule);
+  --color-delegate: var(--tm-delegate);
+  --color-drop: var(--tm-drop);
+
+  --color-heat-0: var(--tm-heat-0);
+  --color-heat-1: var(--tm-heat-1);
+  --color-heat-2: var(--tm-heat-2);
+  --color-heat-3: var(--tm-heat-3);
+  --color-heat-4: var(--tm-heat-4);
 }
 
+:root {
+  --tm-ground: #efefeb;
+  --tm-surface: #fafaf8;
+  --tm-raised: #ffffff;
+  --tm-line: #e5e7eb;
+  --tm-line-soft: #eef0f1;
+
+  --tm-ink: #26383a;
+  --tm-muted: #6b7280;
+  --tm-faint: #9ca3af;
+
+  --tm-primary: #17878a;
+  --tm-primary-deep: #0e5f61;
+  --tm-primary-tint: #e6f2f2;
+  --tm-on-primary: #ffffff;
+
+  --tm-accent: #f26a21;
+  --tm-accent-hover: #b4500f;
+
+  --tm-danger: #dc2626;
+  --tm-danger-tint: #fee2e2;
+
+  --tm-do-first: #f26a21;
+  --tm-schedule: #0e5f61;
+  --tm-delegate: #d9a21b;
+  --tm-drop: #9ca3af;
+
+  --tm-heat-0: #eef0f1;
+  --tm-heat-1: #dcefef;
+  --tm-heat-2: #d6ecec;
+  --tm-heat-3: #9cc6c6;
+  --tm-heat-4: #17878a;
+}
+
+/*
+ * Dark option from the kit: same layouts, shifted grounds. The teal lightens because the
+ * light teal fails contrast against a dark surface; orange keeps its meaning unchanged.
+ */
 [data-theme='dark'] {
-  --color-ground: #0f1a1b;
-  --color-surface: #16292a;
-  --color-ink: #e8f1f0;
-  --color-primary: #5fc3c4;
-  --color-primary-deep: #2fa8ab;
-  --color-muted: #9fb1b1;
-  --color-line: #2c4849;
+  --tm-ground: #0f1a1b;
+  --tm-surface: #16292a;
+  --tm-raised: #1c3536;
+  --tm-line: #2c4849;
+  --tm-line-soft: #24403f;
+
+  --tm-ink: #e8f1f0;
+  --tm-muted: #9fb1b1;
+  --tm-faint: #7a8e8e;
+
+  --tm-primary: #5fc3c4;
+  --tm-primary-deep: #2fa8ab;
+  --tm-primary-tint: #1c3536;
+  --tm-on-primary: #0f1a1b;
+
+  --tm-accent: #f26a21;
+  --tm-accent-hover: #ff8a4a;
+
+  --tm-danger: #9b3b3b;
+  --tm-danger-tint: #3c1e1e;
+
+  --tm-schedule: #2fa8ab;
+  --tm-drop: #7a8e8e;
+
+  --tm-heat-0: #182828;
+  --tm-heat-1: #1b3e3f;
+  --tm-heat-2: #1e6062;
+  --tm-heat-3: #2a9b9d;
+  --tm-heat-4: #5fc3c4;
 }
 
 html {
@@ -34,5 +136,16 @@ body {
   background: var(--color-ground);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  font-size: var(--text-body);
   -webkit-font-smoothing: antialiased;
+}
+
+/* respect the reduced-motion preference rather than animating regardless */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
