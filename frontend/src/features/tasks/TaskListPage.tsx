@@ -1,4 +1,9 @@
-import { Alert, Button, EmptyState, SkeletonRows } from '../../components/ui'
+import { useState } from 'react'
+import { HttpError, taskApi } from '../../api'
+import { Alert, Button, ConfirmDialog, EmptyState, SkeletonRows } from '../../components/ui'
+import { useToast } from '../../components/toast/useToast'
+import type { Task } from '../../types/task'
+import { TaskForm } from './TaskForm'
 import { Pagination } from './Pagination'
 import { TaskCard } from './TaskCard'
 import { TaskFilters } from './TaskFilters'
@@ -20,6 +25,37 @@ export function TaskListPage() {
     clear,
   } = useTaskFilters()
   const { page: result, loading, error, reload } = useTasks(filters)
+  const { notify } = useToast()
+  const [editing, setEditing] = useState<Task | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [deleting, setDeleting] = useState<Task | null>(null)
+  const [deletePending, setDeletePending] = useState(false)
+
+  async function confirmDelete() {
+    if (!deleting) {
+      return
+    }
+    setDeletePending(true)
+    try {
+      await taskApi.remove(deleting.id)
+      notify({ title: 'Task deleted', detail: `“${deleting.title}” removed.` })
+      setDeleting(null)
+      await reload()
+    } catch (caught) {
+      const gone = caught instanceof HttpError && caught.status === 404
+      notify({
+        tone: 'error',
+        title: "Couldn't delete task",
+        detail: gone ? 'It no longer exists.' : 'Network error — try again.',
+      })
+      if (gone) {
+        setDeleting(null)
+        await reload()
+      }
+    } finally {
+      setDeletePending(false)
+    }
+  }
 
   const size = filters.size ?? 10
   const rangeStart = (result?.totalElements ?? 0) === 0 ? 0 : page * size + 1
@@ -34,7 +70,9 @@ export function TaskListPage() {
             Sorted newest first. Filters and search run on the server.
           </p>
         </div>
-        <Button variant="accent">+ New task</Button>
+        <Button variant="accent" onClick={() => setCreating(true)}>
+          + New task
+        </Button>
       </header>
 
       <TaskFilters
@@ -61,7 +99,12 @@ export function TaskListPage() {
             className={`flex flex-col gap-2.5 transition-opacity ${loading ? 'opacity-60' : ''}`}
           >
             {result.content.map((task) => (
-              <TaskCard key={task.id} task={task} onEdit={() => {}} onDelete={() => {}} />
+              <TaskCard
+                key={task.id}
+                task={task}
+                onEdit={setEditing}
+                onDelete={setDeleting}
+              />
             ))}
           </ul>
           <Pagination
@@ -87,9 +130,41 @@ export function TaskListPage() {
         <EmptyState
           title="No tasks yet"
           description="Everything you are working on will show up here. Start with the first one."
-          action={<Button variant="accent">Create your first task</Button>}
+          action={
+            <Button variant="accent" onClick={() => setCreating(true)}>
+              Create your first task
+            </Button>
+          }
         />
       )}
+
+      {creating || editing ? (
+        <TaskForm
+          // remount on target change so the form state starts from the right task
+          key={editing?.id ?? 'new'}
+          open
+          task={editing}
+          onClose={() => {
+            setCreating(false)
+            setEditing(null)
+          }}
+          onSaved={() => {
+            setCreating(false)
+            setEditing(null)
+            void reload()
+          }}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={deleting !== null}
+        title="Delete this task?"
+        description={`“${deleting?.title ?? ''}” will be removed. This can’t be undone.`}
+        confirmLabel="Delete task"
+        pending={deletePending}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setDeleting(null)}
+      />
     </div>
   )
 }
