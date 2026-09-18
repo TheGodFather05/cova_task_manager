@@ -68,7 +68,9 @@ public class RefreshTokenService {
         refreshTokenRepository.save(stored);
 
         User user = stored.getUser();
-        return new RotationResult(user, persist(user, stored.getFamilyId()));
+        // read the email inside the transaction: the lazy proxy is detached once it returns
+        String email = user.getEmail();
+        return new RotationResult(email, persist(user, stored.getFamilyId()));
     }
 
     @Transactional
@@ -82,7 +84,7 @@ public class RefreshTokenService {
         return refreshTokenRepository.deleteExpired(cutoff);
     }
 
-    public record RotationResult(User user, IssuedToken token) {
+    public record RotationResult(String email, IssuedToken token) {
     }
 
     private IssuedToken persist(User user, String familyId) {

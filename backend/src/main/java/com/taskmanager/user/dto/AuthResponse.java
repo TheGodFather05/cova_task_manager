@@ -1,4 +1,6 @@
 package com.taskmanager.user.dto;
 
-public record AuthResponse(String token, String email) {
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+public record AuthResponse(String token, String email, @JsonIgnore String refreshToken) {
 }
