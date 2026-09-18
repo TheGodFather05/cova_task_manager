@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { HttpError } from '../../api'
 import { Alert } from '../../components/ui/Alert'
 import { Field } from '../../components/ui/Field'
-import { SubmitButton } from '../../components/ui/SubmitButton'
+import { Button } from '../../components/ui/Button'
 import { useAuth } from '../../auth/useAuth'
 import { AuthCard } from './AuthCard'
 import { PasswordMeter } from './PasswordMeter'
@@ -97,9 +97,9 @@ export function RegisterPage() {
           error={mismatch ? 'Passwords do not match.' : undefined}
           required
         />
-        <SubmitButton pending={pending} pendingLabel="Creating account…">
+        <Button type="submit" pending={pending} pendingLabel="Creating account…" className="mt-1">
           Create account
-        </SubmitButton>
+        </Button>
       </form>
     </AuthCard>
   )

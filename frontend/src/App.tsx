@@ -3,6 +3,7 @@ import { ProtectedRoute } from './auth/ProtectedRoute'
 import { AppLayout } from './components/layout/AppLayout'
 import { LoginPage } from './features/auth/LoginPage'
 import { RegisterPage } from './features/auth/RegisterPage'
+import { PreviewPage } from './features/preview/PreviewPage'
 import { ReportsPlaceholder } from './features/reports/ReportsPlaceholder'
 import { TasksPlaceholder } from './features/tasks/TasksPlaceholder'
 
@@ -15,6 +16,9 @@ export default function App() {
         <Route element={<AppLayout />}>
           <Route path="/tasks" element={<TasksPlaceholder />} />
           <Route path="/reports" element={<ReportsPlaceholder />} />
+          {import.meta.env.DEV ? (
+            <Route path="/preview" element={<PreviewPage />} />
+          ) : null}
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/tasks" replace />} />

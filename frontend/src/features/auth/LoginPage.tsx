@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { HttpError } from '../../api'
 import { Alert } from '../../components/ui/Alert'
 import { Field } from '../../components/ui/Field'
-import { SubmitButton } from '../../components/ui/SubmitButton'
+import { Button } from '../../components/ui/Button'
 import { useAuth } from '../../auth/useAuth'
 import { AuthCard } from './AuthCard'
 
@@ -77,9 +77,9 @@ export function LoginPage() {
           error={fieldErrors.password}
           required
         />
-        <SubmitButton pending={pending} pendingLabel="Signing in…">
+        <Button type="submit" pending={pending} pendingLabel="Signing in…" className="mt-1">
           Sign in
-        </SubmitButton>
+        </Button>
       </form>
     </AuthCard>
   )
