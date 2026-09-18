@@ -1,6 +1,7 @@
 import { useTheme } from '../theme/useTheme'
 
-export function ThemeToggle() {
+/** `onPrimary` renders the toggle for the teal header, where the surface variant would vanish. */
+export function ThemeToggle({ onPrimary = false }: { onPrimary?: boolean }) {
   const { resolved, toggle } = useTheme()
   const target = resolved === 'dark' ? 'light' : 'dark'
 
@@ -9,9 +10,12 @@ export function ThemeToggle() {
       type="button"
       onClick={toggle}
       aria-label={`Switch to ${target} theme`}
-      className="inline-flex size-9 items-center justify-center rounded-control border border-line
-                 bg-surface text-muted transition-colors hover:border-primary hover:text-primary
-                 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      className={`inline-flex size-9 items-center justify-center rounded-control transition-colors
+                  focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                    onPrimary
+                      ? 'text-on-primary/80 hover:bg-on-primary/10 hover:text-on-primary focus-visible:outline-on-primary'
+                      : 'border border-line bg-surface text-muted hover:border-primary hover:text-primary focus-visible:outline-primary'
+                  }`}
     >
       {resolved === 'dark' ? <SunIcon /> : <MoonIcon />}
     </button>
@@ -33,7 +37,11 @@ function SunIcon() {
 function MoonIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-4">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"
+      />
     </svg>
   )
 }
