@@ -1,6 +1,7 @@
 package com.taskmanager.common;
 
 import com.taskmanager.common.exception.EmailAlreadyUsedException;
+import com.taskmanager.common.exception.InvalidRefreshTokenException;
 import com.taskmanager.common.exception.InvalidReportParameterException;
 import com.taskmanager.common.exception.ResourceNotFoundException;
 import jakarta.validation.ConstraintViolation;
@@ -67,6 +68,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidReportParameterException.class)
     public ResponseEntity<ApiError> handleInvalidReportParameter(InvalidReportParameterException e) {
         return status(HttpStatus.BAD_REQUEST, e.getMessage(), null);
+    }
+
+    @ExceptionHandler(InvalidRefreshTokenException.class)
+    public ResponseEntity<ApiError> handleInvalidRefreshToken(InvalidRefreshTokenException e) {
+        return status(HttpStatus.UNAUTHORIZED, "invalid refresh token", null);
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)

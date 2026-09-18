@@ -16,7 +16,11 @@ spring:
 
 jwt:
   secret: ${JWT_SECRET}
-  expiration-minutes: ${JWT_EXPIRATION_MINUTES:120}
+  # short-lived: a stolen access token is only useful until it expires
+  expiration-minutes: ${JWT_EXPIRATION_MINUTES:15}
+  refresh-days: ${JWT_REFRESH_DAYS:30}
+  # Secure is disabled in dev so the cookie works over plain http on localhost
+  refresh-cookie-secure: ${JWT_REFRESH_COOKIE_SECURE:false}
 
 springdoc:
   swagger-ui:

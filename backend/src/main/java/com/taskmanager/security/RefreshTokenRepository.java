@@ -11,14 +11,16 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
 
     Optional<RefreshToken> findByTokenHash(String tokenHash);
 
-    @Modifying
+    // a bulk update bypasses the persistence context; without clearAutomatically a token loaded
+    // earlier in the same transaction would still read as active after its family was revoked
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update RefreshToken t set t.revokedAt = :now
             where t.familyId = :familyId and t.revokedAt is null
             """)
     int revokeFamily(@Param("familyId") String familyId, @Param("now") LocalDateTime now);
 
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("delete from RefreshToken t where t.expiresAt < :cutoff")
     int deleteExpired(@Param("cutoff") LocalDateTime cutoff);
 }
