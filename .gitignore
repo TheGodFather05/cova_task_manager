@@ -2,3 +2,16 @@ node_modules/
 .DS_Store
 .env
 _bmad-output/
+
+# Flutter
+mobile/.dart_tool/
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/ios/Pods/
+mobile/ios/.symlinks/
+mobile/ios/Flutter/Flutter.framework
+mobile/ios/Flutter/Generated.xcconfig
+mobile/ios/Flutter/flutter_export_environment.sh
+mobile/android/.gradle/
+mobile/android/local.properties
