@@ -6,6 +6,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/badges.dart';
 import '../../widgets/primitives.dart';
 import 'task_card.dart';
+import '../reports/reports_screen.dart';
 import 'task_form_screen.dart';
 
 class TaskListScreen extends StatefulWidget {
@@ -207,6 +208,16 @@ class _Header extends StatelessWidget {
           Text('My tasks',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: c.onPrimary)),
           const Spacer(),
+          GestureDetector(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ReportsScreen()),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Icon(Icons.insights_outlined,
+                  size: 20, color: c.onPrimary.withValues(alpha: 0.9)),
+            ),
+          ),
           GestureDetector(
             onTap: onSignOut,
             child: Text('Log out',
