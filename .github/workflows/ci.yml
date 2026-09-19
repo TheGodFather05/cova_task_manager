@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+
+      # the report aggregation tests bucket by hour; a non-UTC runner shifts every bucket
+      - name: Verify
+        run: ./mvnw --batch-mode verify
+        working-directory: backend
+        env:
+          TZ: UTC
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports
+          path: backend/target/surefire-reports/
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+        working-directory: frontend
+
+      - name: Typecheck
+        run: npm run typecheck
+        working-directory: frontend
+
+      - name: Lint
+        run: npm run lint
+        working-directory: frontend
+
+      - name: Test
+        run: npm test
+        working-directory: frontend
+
+      - name: Build
+        run: npm run build
+        working-directory: frontend
+
+  deploy:
+    name: Deploy to Cloud Run
+    needs: [backend, frontend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.GCP_PROJECT_ID != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+
+      # keyless: the runner exchanges its OIDC token for GCP credentials, so no service
+      # account key is stored in the repository
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and push images
+        env:
+          REGISTRY: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/taskline
+        run: |
+          docker build -t "$REGISTRY/backend:$GITHUB_SHA" backend
+          docker build -t "$REGISTRY/frontend:$GITHUB_SHA" frontend
+          docker push "$REGISTRY/backend:$GITHUB_SHA"
+          docker push "$REGISTRY/frontend:$GITHUB_SHA"
+
+      - name: Deploy backend
+        env:
+          REGISTRY: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/taskline
+        run: |
+          gcloud run deploy taskline-backend \
+            --image "$REGISTRY/backend:$GITHUB_SHA" \
+            --region "${{ vars.GCP_REGION }}" \
+            --platform managed \
+            --no-allow-unauthenticated \
+            --add-cloudsql-instances "${{ vars.CLOUD_SQL_INSTANCE }}" \
+            --set-env-vars "SPRING_PROFILES_ACTIVE=cloud,TZ=UTC,MYSQL_DATABASE=${{ vars.MYSQL_DATABASE }},MYSQL_USER=${{ vars.MYSQL_USER }},CLOUD_SQL_INSTANCE=${{ vars.CLOUD_SQL_INSTANCE }}" \
+            --set-secrets "JWT_SECRET=jwt-secret:latest,MYSQL_PASSWORD=mysql-password:latest" \
+            --quiet
+
+      - name: Deploy frontend
+        env:
+          REGISTRY: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/taskline
+        run: |
+          BACKEND_URL=$(gcloud run services describe taskline-backend \
+            --region "${{ vars.GCP_REGION }}" --format 'value(status.url)')
+          gcloud run deploy taskline-frontend \
+            --image "$REGISTRY/frontend:$GITHUB_SHA" \
+            --region "${{ vars.GCP_REGION }}" \
+            --platform managed \
+            --allow-unauthenticated \
+            --set-env-vars "BACKEND_URL=$BACKEND_URL,BACKEND_HOST=${BACKEND_URL#https://}" \
+            --quiet
