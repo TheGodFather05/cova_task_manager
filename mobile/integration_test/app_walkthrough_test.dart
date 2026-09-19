@@ -35,12 +35,23 @@ void main() {
 
     // one tap writes both axes; scope the finder to the selector so a task card's badge
     // behind the modal cannot be matched instead
+
     final scheduleCell = find.descendant(
       of: find.byType(QuadrantSelector),
       matching: find.text('Schedule'),
     );
-    expect(scheduleCell, findsOneWidget);
-    await tester.tap(scheduleCell);
+
+    final cellWidget = find.ancestor(
+      of: scheduleCell,
+      matching: find.byType(GestureDetector),
+    );
+
+    // the title field autofocuses, so the keyboard covers the lower half of the form:
+    // scroll the grid above it or the tap lands on the keyboard instead
+    await tester.ensureVisible(scheduleCell);
+    await tester.pumpAndSettle();
+
+    await tester.tap(cellWidget.first, warnIfMissed: true);
     await tester.pumpAndSettle();
     // the helper line under the grid now reports the pair that was written
     expect(find.text('No priority set yet'), findsNothing);
