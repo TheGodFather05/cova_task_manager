@@ -45,3 +45,22 @@ spring:
     url: jdbc:mysql://${MYSQL_HOST:mysql}:${MYSQL_PORT:3306}/${MYSQL_DATABASE}?serverTimezone=UTC
     username: ${MYSQL_USER}
     password: ${MYSQL_PASSWORD}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: cloud
+  datasource:
+    # Cloud SQL is reached through a unix socket, not host:port — the instance has no public IP
+    url: jdbc:mysql:///${MYSQL_DATABASE}?cloudSqlInstance=${CLOUD_SQL_INSTANCE}&socketFactory=com.google.cloud.sql.mysql.SocketFactory&serverTimezone=UTC
+    username: ${MYSQL_USER}
+    password: ${MYSQL_PASSWORD}
+  jpa:
+    hibernate:
+      # Cloud Run scales to zero and back; schema changes must not race between instances
+      ddl-auto: validate
+
+server:
+  # Cloud Run injects PORT and routes to it
+  port: ${PORT:8080}

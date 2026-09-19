@@ -21,6 +21,7 @@
         <java.version>21</java.version>
         <jjwt.version>0.13.0</jjwt.version>
         <springdoc.version>2.9.1</springdoc.version>
+        <cloud-sql.version>1.30.0</cloud-sql.version>
     </properties>
 
     <dependencies>
@@ -51,6 +52,14 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
+        </dependency>
+
+        <!-- Cloud SQL reaches the instance over a unix socket; only used by the cloud profile -->
+        <dependency>
+            <groupId>com.google.cloud.sql</groupId>
+            <artifactId>mysql-socket-factory-connector-j-8</artifactId>
+            <version>${cloud-sql.version}</version>
+            <scope>runtime</scope>
         </dependency>
 
         <dependency>
