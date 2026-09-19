@@ -11,6 +11,30 @@ docs/       architecture.md — document de conception
 
 Document de conception détaillé : [`docs/architecture.md`](docs/architecture.md).
 
+## Captures d'écran
+
+### Interface web
+
+| Liste des tâches | Vue matrice |
+|---|---|
+| ![Liste des tâches](docs/screenshots/web-tasks-list.jpg) | ![Vue matrice](docs/screenshots/web-matrix.jpg) |
+
+Le formulaire et sa grille 2×2 : un seul appui écrit les deux axes, et aucune paire
+contradictoire n'est atteignable.
+
+![Formulaire et sélecteur 2×2](docs/screenshots/web-task-form.jpg)
+
+Les rapports, en thème clair puis sombre. Les graphiques sont en SVG et CSS, sans librairie.
+Les indicateurs sans dénominateur affichent « — » et non « 0 % ».
+
+| Clair | Sombre |
+|---|---|
+| ![Rapports](docs/screenshots/web-reports.jpg) | ![Rapports en thème sombre](docs/screenshots/web-reports-dark.jpg) |
+
+### Application mobile
+
+<img src="docs/screenshots/mobile-tasks-list.jpg" width="320" alt="Liste des tâches sur mobile">
+
 ## Stack
 
 | Couche | Technologie |
