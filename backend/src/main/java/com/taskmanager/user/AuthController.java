@@ -4,6 +4,7 @@ import com.taskmanager.common.ApiError;
 import com.taskmanager.common.exception.InvalidRefreshTokenException;
 import com.taskmanager.security.RefreshCookie;
 import com.taskmanager.user.dto.AuthResponse;
+import com.taskmanager.user.dto.MobileAuthResponse;
 import com.taskmanager.user.dto.LoginRequest;
 import com.taskmanager.user.dto.RegisterRequest;
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -29,6 +31,10 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "auth", description = "Registration, login and token rotation")
 @SecurityRequirements
 public class AuthController {
+
+    static final String CLIENT_HEADER = "X-Client";
+    static final String REFRESH_HEADER = "X-Refresh-Token";
+    private static final String MOBILE = "mobile";
 
     private final AuthService authService;
     private final RefreshCookie refreshCookie;
@@ -40,8 +46,10 @@ public class AuthController {
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     @ApiResponse(responseCode = "409", description = "Email already used",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
-        return withRefreshCookie(authService.register(request), HttpStatus.CREATED);
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request,
+                                      @RequestHeader(value = CLIENT_HEADER, required = false)
+                                      String client) {
+        return respond(authService.register(request), HttpStatus.CREATED, client);
     }
 
     @PostMapping("/login")
@@ -51,8 +59,10 @@ public class AuthController {
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     @ApiResponse(responseCode = "401", description = "Invalid credentials",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        return withRefreshCookie(authService.login(request), HttpStatus.OK);
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request,
+                                   @RequestHeader(value = CLIENT_HEADER, required = false)
+                                   String client) {
+        return respond(authService.login(request), HttpStatus.OK, client);
     }
 
     @PostMapping("/refresh")
@@ -60,27 +70,41 @@ public class AuthController {
     @ApiResponse(responseCode = "200", description = "New access token issued")
     @ApiResponse(responseCode = "401", description = "Missing, expired, revoked or replayed token",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
-    public ResponseEntity<AuthResponse> refresh(HttpServletRequest request) {
+    public ResponseEntity<?> refresh(HttpServletRequest request,
+                                     @RequestHeader(value = CLIENT_HEADER, required = false)
+                                     String client,
+                                     @RequestHeader(value = REFRESH_HEADER, required = false)
+                                     String headerToken) {
+        // browsers send the cookie; native clients send the header they were given at login
         String rawToken = refreshCookie.read(request)
-                .orElseThrow(() -> new InvalidRefreshTokenException("no refresh cookie"));
-        return withRefreshCookie(authService.refresh(rawToken), HttpStatus.OK);
+                .or(() -> java.util.Optional.ofNullable(headerToken).filter(t -> !t.isBlank()))
+                .orElseThrow(() -> new InvalidRefreshTokenException("no refresh token"));
+        return respond(authService.refresh(rawToken), HttpStatus.OK, client);
     }
 
     @PostMapping("/logout")
     @Operation(summary = "Revoke the refresh token family and clear the cookie")
     @ApiResponse(responseCode = "204", description = "Logged out")
-    public ResponseEntity<Void> logout(HttpServletRequest request) {
-        refreshCookie.read(request).ifPresent(authService::logout);
+    public ResponseEntity<Void> logout(HttpServletRequest request,
+                                       @RequestHeader(value = REFRESH_HEADER, required = false)
+                                       String headerToken) {
+        refreshCookie.read(request)
+                .or(() -> java.util.Optional.ofNullable(headerToken).filter(t -> !t.isBlank()))
+                .ifPresent(authService::logout);
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.clear())
                 .build();
     }
 
-    // the refresh token leaves only through the httpOnly cookie, never through the JSON body
-    private ResponseEntity<AuthResponse> withRefreshCookie(AuthResponse response,
-                                                           HttpStatus status) {
-        return ResponseEntity.status(status)
-                .header(HttpHeaders.SET_COOKIE, refreshCookie.issue(response.refreshToken()))
-                .body(response);
+    /**
+     * Browsers get the refresh token only through the httpOnly cookie. Native clients, which
+     * have no cookie jar, additionally get it in the body and keep it in the platform keychain.
+     */
+    private ResponseEntity<?> respond(AuthResponse response, HttpStatus status, String client) {
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(status)
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.issue(response.refreshToken()));
+        return MOBILE.equalsIgnoreCase(client)
+                ? builder.body(MobileAuthResponse.from(response))
+                : builder.body(response);
     }
 }
