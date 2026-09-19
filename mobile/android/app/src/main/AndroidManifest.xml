@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- flutter injects this in debug builds only; release builds need it declared -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="taskline"
         android:name="${applicationName}"
