@@ -7,7 +7,7 @@ class TaskApi {
 
   /// Filtering, search and pagination run on the server: the app never downloads the whole
   /// list to narrow it locally.
-  Future<Page<Task>> list({
+  Future<TaskPage> list({
     int page = 0,
     int size = 20,
     TaskStatus? status,
@@ -22,7 +22,7 @@ class TaskApi {
       if (search != null && search.isNotEmpty) 'search': search,
     }) as Map<String, dynamic>;
 
-    return Page<Task>(
+    return TaskPage(
       content: (json['content'] as List)
           .map((t) => Task.fromJson(t as Map<String, dynamic>))
           .toList(),

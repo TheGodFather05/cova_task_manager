@@ -36,16 +36,34 @@ class ApiClient {
   /// already-used token, which the backend correctly reads as theft.
   Future<bool>? _refreshInFlight;
 
-  Future<String?> get accessToken => _storage.read(key: _accessKey);
+  /// The keychain can hang or throw on a fresh simulator; a missing token is recoverable,
+  /// a stuck splash screen is not.
+  Future<String?> _read(String key) async {
+    try {
+      return await _storage.read(key: key).timeout(const Duration(seconds: 3));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String?> get accessToken => _read(_accessKey);
 
   Future<void> saveSession({required String access, String? refresh}) async {
-    await _storage.write(key: _accessKey, value: access);
-    if (refresh != null) await _storage.write(key: _refreshKey, value: refresh);
+    try {
+      await _storage.write(key: _accessKey, value: access);
+      if (refresh != null) await _storage.write(key: _refreshKey, value: refresh);
+    } catch (_) {
+      // storage unavailable: the session still works until the app is closed
+    }
   }
 
   Future<void> clearSession() async {
-    await _storage.delete(key: _accessKey);
-    await _storage.delete(key: _refreshKey);
+    try {
+      await _storage.delete(key: _accessKey);
+      await _storage.delete(key: _refreshKey);
+    } catch (_) {
+      // nothing to clear
+    }
   }
 
   Uri _uri(String path, [Map<String, String>? query]) {
@@ -82,7 +100,7 @@ class ApiClient {
   Future<bool> _refresh() {
     return _refreshInFlight ??= () async {
       try {
-        final stored = await _storage.read(key: _refreshKey);
+        final stored = await _read(_refreshKey);
         if (stored == null) return false;
         // mobile has no cookie jar, so the refresh token travels in a header
         final response = await _http.post(

@@ -133,15 +133,15 @@ class TaskInput {
       };
 }
 
-class Page<T> {
-  const Page({
+class TaskPage {
+  const TaskPage({
     required this.content,
     required this.totalElements,
     required this.totalPages,
     required this.number,
   });
 
-  final List<T> content;
+  final List<Task> content;
   final int totalElements;
   final int totalPages;
   final int number;
