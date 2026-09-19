@@ -350,9 +350,14 @@ Variables d'environnement : `.env.example` versionné, `.env` ignoré.
 
 GitHub Actions, trois jobs :
 
-1. Build et tests du backend (Maven, MySQL en service).
-2. Build du frontend (typecheck, lint, build Vite).
+1. Build et tests du backend (Maven). **Pas de service MySQL** : les tests d'intégration
+   tournent sur H2 en mémoire (`application-test.yml`), un conteneur MySQL serait démarré pour
+   rien. `TZ=UTC` sur le job, car les tests de rapports regroupent par heure.
+2. Build du frontend (typecheck, lint, tests Vitest, build Vite).
 3. Build et publication des images, puis déploiement Cloud Run — sur `main` uniquement.
+   Le job est **conditionné à la présence de `vars.GCP_PROJECT_ID`** : sans configuration GCP
+   il est ignoré, il n'échoue pas. Authentification par *Workload Identity Federation*, donc
+   aucune clé de compte de service n'est stockée dans le dépôt.
 
 ---
 
