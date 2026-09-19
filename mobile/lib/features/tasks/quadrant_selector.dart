@@ -116,6 +116,8 @@ class _Cell extends StatelessWidget {
     final isSelected = selected == cell.quadrant;
 
     return GestureDetector(
+      // opaque: the whole cell is the target, including its padding — not just the labels
+      behavior: HitTestBehavior.opaque,
       // both axes are written in one call, so no state ever holds half a selection
       onTap: () => onTap(cell),
       child: Container(
