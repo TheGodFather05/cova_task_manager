@@ -158,6 +158,42 @@ Mobile : correspondance des quadrants et analyse des dates. S'y ajoute un parcou
 (`flutter test integration_test/`) qui exige un backend accessible, et reste donc hors de la
 commande ci-dessus.
 
+## Intégration continue
+
+`.github/workflows/ci.yml` — sur chaque `push` et chaque *pull request* vers `main`.
+
+| Job | Contenu |
+|---|---|
+| `backend` | `./mvnw verify` (84 tests) sous `TZ=UTC` |
+| `frontend` | `npm ci`, typecheck, lint, 45 tests, build Vite |
+| `deploy` | Images Docker puis Cloud Run — `main` uniquement |
+
+Les tests backend tournent sur **H2 en mémoire**, pas sur MySQL : aucun service de base de
+données n'est démarré dans la CI. `TZ=UTC` est imposé au job parce que les rapports regroupent
+par heure — un *runner* dans un autre fuseau décalerait chaque intervalle, exactement le bug
+corrigé côté backend.
+
+### Déploiement
+
+Le job `deploy` ne s'exécute que si la variable de dépôt `GCP_PROJECT_ID` est définie. Tant
+qu'elle ne l'est pas, il est **ignoré et non en échec** : la CI reste verte sans configuration
+GCP. Pour l'activer, définir les variables de dépôt suivantes :
+
+| Variable | Exemple |
+|---|---|
+| `GCP_PROJECT_ID` | `cova-509014` |
+| `GCP_REGION` | `europe-west1` |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | `projects/123/locations/global/workloadIdentityPools/github/providers/repo` |
+| `GCP_SERVICE_ACCOUNT` | `deployer@cova-509014.iam.gserviceaccount.com` |
+| `CLOUD_SQL_INSTANCE` | `cova-509014:europe-west1:taskline` |
+| `MYSQL_DATABASE` | `taskmanager` |
+| `MYSQL_USER` | `taskline` |
+
+Les secrets `jwt-secret` et `mysql-password` sont lus depuis **Secret Manager** par Cloud Run,
+jamais depuis GitHub. L'authentification utilise *Workload Identity Federation* : le *runner*
+échange son jeton OIDC contre des identifiants GCP, donc aucune clé de compte de service n'est
+stockée dans le dépôt.
+
 ## Variables d'environnement
 
 Aucun secret n'est versionné. Le secret JWT n'a **pas** de valeur par défaut : l'application
