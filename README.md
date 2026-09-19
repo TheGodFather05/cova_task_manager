@@ -418,48 +418,6 @@ vers `Quadrant` en Java. La base renvoie au plus quatre lignes portant déjà le
 c'est du mapping, pas de l'agrégation. Un `CASE` SQL dupliquerait `Quadrant.of()` dans du texte
 de requête, avec le risque de divergence.
 
-### Gestion du fuseau horaire dans les rapports
-
-Les rapports acceptent un paramètre `zone` optionnel (ex. `Africa/Douala`), UTC par défaut. Les
-bornes de journée, de semaine, de mois et d'année sont calculées **dans ce fuseau** : sans cela,
-un rapport quotidien est décalé pour tout utilisateur hors UTC.
-
-`completedAt` est un `LocalDateTime`, donc sans offset. La convention est explicite : la colonne
-contient toujours de l'heure **UTC**. `PeriodResolver` concentre la conversion en un seul
-endroit — bornes calculées dans le fuseau utilisateur, puis `toInstant()`, puis
-`LocalDateTime.ofInstant(instant, ZoneOffset.UTC)` pour la requête. Le retour compte autant :
-les lignes reviennent en composantes UTC et sont reconverties dans le fuseau utilisateur *avant*
-le regroupement en intervalles, sinon les bornes sont zonées et les intervalles UTC.
-
-Pour que la convention tienne, la JVM tourne en UTC (`TimeZone.setDefault` au démarrage,
-`-Duser.timezone=UTC` pour les tests, `TZ=UTC` dans les conteneurs). Les fonctions de date des
-requêtes d'agrégation sont évaluées dans le fuseau de la session JDBC : si la JVM et cette
-session divergent, **tous les agrégats sont décalés de l'offset**, et l'erreur est invisible car
-cohérente avec elle-même.
-
-Les intervalles sont produits en itérant des instants, jamais en comptant : un jour de
-changement d'heure fait 23 ou 25 heures, et les longueurs de mois viennent de l'arithmétique
-calendaire. Le début de semaine est fixé au lundi explicitement, et non déduit de la locale de
-la requête.
-
-`completedAt` sert de base aux rapports plutôt qu'`updatedAt`, qui change à chaque modification
-et ne permettrait pas de savoir *quand* une tâche a réellement été achevée.
-
-### Taux d'achèvement et variation
-
-`GET /api/reports/summary` compte les tâches créées et les tâches terminées sur la période comme
-**deux mesures indépendantes** : une tâche terminée aujourd'hui mais créée la semaine dernière
-compte dans les tâches terminées. Le taux peut donc dépasser 100 % lors d'un rattrapage
-d'arriéré. Le choix inverse — ne compter que les tâches créées *et* terminées dans la période —
-bornerait le taux à 100 % mais ferait diverger la synthèse du graphique de tendance affiché
-au-dessous, qui repose sur `completedAt` seul.
-
-La période courante étant partielle et la précédente complète, la réponse porte
-`currentPeriodComplete` : le backend rapporte le fait sans déformer la comparaison. La variation
-du taux est exprimée en **points de pourcentage** (`completionRatePoints`) : « +25 % » est
-ambigu entre 60→75 et 60→85, « +15 points » ne l'est pas. Une variation indéfinie (dénominateur
-nul) est renvoyée à `null`, jamais à `0`, qui se lirait « stable ».
-
 ### La grille 2×2 rend l'état invalide inatteignable
 
 Le backend garantit qu'une paire contradictoire est irreprésentable ; l'interface applique le
@@ -478,67 +436,6 @@ de la réponse du serveur.
 Une seule table (`quadrant.ts`) porte la correspondance dans les deux sens, et elle est testée
 dans les deux sens : c'est le miroir exact de `Quadrant.java`, et une divergence silencieuse
 mal-étiquetterait toutes les tâches.
-
-### Jetons de design et thème sombre
-
-Toutes les couleurs sont des variables CSS déclarées une fois sur `:root`, redéfinies sous
-`[data-theme="dark"]`. Tailwind les consomme via `@theme`, donc `bg-surface` ou `text-muted`
-deviennent thématiques automatiquement : **le code ne contient aucune variante `dark:`**, et le
-balisage est identique dans les deux thèmes.
-
-Le teal s'éclaircit en sombre (contraste insuffisant sinon) ; l'orange, lui, ne change pas —
-il porte une signification (« agissez ici »), pas une identité.
-
-Un script inline dans `<head>`, exécuté **avant** la feuille de style et le bundle, pose
-`data-theme` depuis `localStorage`. Le thème correct est donc en place à la première peinture :
-pas de flash clair au chargement d'une page sombre.
-
-### Graphiques sans librairie
-
-Les cinq visualisations reprennent les techniques du kit de design plutôt qu'une dépendance :
-
-| Graphique | Technique |
-|---|---|
-| Courbe de tendance | `<svg viewBox="0 0 100 40">` + `polyline` et `polygon` |
-| Donut des tâches ouvertes | `conic-gradient` à bornes cumulées |
-| Barres par quadrant | hauteurs en `%` |
-| Barres par statut | largeurs en `%` |
-| Heatmap annuelle | CSS grid, 7 lignes × 53 colonnes |
-
-Deux détails décident du résultat :
-
-- **`vector-effect="non-scaling-stroke"`** sur la courbe. Avec `preserveAspectRatio="none"`, le
-  trait est étiré par la déformation du viewBox : un segment horizontal ne fait pas la même
-  épaisseur qu'un vertical. Les étiquettes sont en HTML positionné au-dessus du SVG, jamais en
-  `<text>`, pour la même raison.
-- **La hauteur d'une barre est un ratio du maximum, pas le champ `percentage` de l'API.**
-  `percentage` est une part du total : quatre quadrants égaux donneraient quatre quarts de
-  barre. Il sert au libellé, le ratio à la hauteur.
-
-La heatmap complète sa première colonne selon le jour de semaine du 1er janvier ; sans ce
-décalage, toute la grille est pivotée et chaque étiquette de jour est fausse.
-
-### Les cas dégénérés sont traités, pas subis
-
-Un compte neuf produit **tous** les cas limites dès sa première visite : aucune tâche, aucune
-période précédente, donc des dénominateurs nuls partout. Le backend renvoie `null` plutôt que
-`0` lorsqu'un taux est indéfini ; l'interface propage ce `null` jusqu'à l'affichage.
-
-| Cas | Affichage |
-|---|---|
-| Taux indéfini (`null`) | **`—`**, jamais `0 %` — afficher `0 %` affirmerait un fait que l'API a refusé d'énoncer |
-| Variation sans période précédente | `—` |
-| Série entièrement à zéro | Ligne plate au sol, pas de division par zéro |
-| Donut à total nul | Message explicite, **pas** d'anneau plein qui suggérerait une part de 100 % |
-| Année sans activité | « Nothing completed this year yet. » au-dessus de la grille |
-
-`currentPeriodComplete: false` est le cas **normal**, pas l'exception : la période en cours est
-toujours partielle et comparée à une période complète. L'interface le signale au lieu de laisser
-croire à une baisse.
-
-Ces états ont été construits et vérifiés sur une route de prévisualisation réservée au
-développement (`/preview`), avec des fixtures dégénérées, **avant** d'être branchés sur l'API —
-et cette route est retirée du bundle de production.
 
 ### Renouvellement de session silencieux
 
@@ -564,31 +461,3 @@ ne voit qu'une seule origine : le cookie `SameSite=Strict` est envoyé normaleme
 nginx renvoie `index.html` pour toute route inconnue, afin qu'un lien profond comme `/reports`
 fonctionne au rechargement.
 
-### Ce qui est testé, et pourquoi si peu
-
-45 tests, tous sur des **fonctions pures** : correspondance des quadrants dans les deux sens,
-mathématiques des graphiques (testées d'abord sur leurs entrées dégénérées), analyse des dates,
-formatage des variations. Ces fonctions ont été extraites de leurs composants exprès pour être
-testables sans rendu.
-
-Il n'y a **pas** de tests de rendu ni de tests end-to-end. Sur une interface CRUD au-dessus
-d'une API déjà couverte par 78 tests, ils assureraient surtout que des classes Tailwind existent.
-Le reste a été vérifié à la main contre le vrai backend, à chaque étape : isolation entre
-comptes, charges utiles réseau, cas dégénérés sur compte neuf, thème clair et sombre, et rendu
-à 390 px.
-
-### Écarts assumés avec le kit de design
-
-- **Boutons « Export PDF / CSV » omis.** Le backend n'a pas d'endpoint d'export et le README le
-  classe hors périmètre. Un bouton décoratif est pire que son absence.
-- **« Status funnel » renommé « Tasks by status ».** Les trois comptes sont des ensembles
-  disjoints, pas des étapes successives ; la métaphore de l'entonnoir affirmerait une déperdition
-  entre étapes qui n'existe pas. Même donnée, libellé honnête.
-- **Pas de barre d'onglets en bas en mobile.** Le kit conserve la même barre teal sur les écrans
-  390 px, simplement empilée ; c'est ce qui est implémenté, avec un seul composant qui reflue.
-
-## Hors périmètre
-
-Non implémenté et assumé comme tel : rôles et permissions, partage de tâches entre utilisateurs,
-notifications, pièces jointes, tâches récurrentes, corbeille, export des rapports,
-internationalisation.
