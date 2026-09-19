@@ -35,6 +35,7 @@ natifs (voir « Graphiques sans librairie » plus bas).
 - JDK 21 (le build cible explicitement la version 21)
 - Node 20 ou plus récent
 - Docker et Docker Compose, ou une instance MySQL 8 accessible
+- Flutter 3.47 et Dart 3.13 pour l'application mobile uniquement
 
 Maven n'a pas besoin d'être installé : le wrapper `./mvnw` est versionné dans le dépôt et
 télécharge la version définie dans `.mvn/wrapper/maven-wrapper.properties`.
@@ -74,11 +75,54 @@ cd frontend && npm install && npm run dev
 L'interface est sur <http://localhost:5173> et Vite proxifie `/api` vers `localhost:8080`.
 Le profil backend `dev` est actif par défaut et se connecte à `localhost:3306`.
 
+### Lancement de l'application mobile
+
+L'application mobile consomme la même API que l'interface web. Le backend doit donc tourner
+avant de la lancer.
+
+```bash
+cd mobile && flutter pub get
+flutter run
+```
+
+Sans `--dart-define`, l'URL de l'API est déduite de la plateforme : `10.0.2.2:8080` sur
+émulateur Android — l'émulateur ne joint jamais la machine hôte par `localhost` — et
+`localhost:8080` ailleurs. Sur un téléphone physique, aucune de ces deux valeurs ne convient :
+il faut passer l'adresse de la machine sur le réseau local.
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://192.168.1.220:8080
+```
+
+### Construction d'un APK
+
+```bash
+flutter build apk --release --dart-define=API_BASE_URL=http://192.168.1.220:8080
+```
+
+L'APK est écrit dans `build/app/outputs/flutter-apk/app-release.apk`.
+
+**L'URL de l'API est figée à la compilation.** Changer de réseau ou pointer vers un backend
+déployé impose une reconstruction avec une autre valeur de `--dart-define` ; elle n'est pas
+modifiable depuis l'application.
+
+Deux réglages ne concernent que les builds `release`, et sont invisibles en `debug` :
+
+- Flutter n'injecte `android.permission.INTERNET` que dans le manifeste de debug. Elle est donc
+  déclarée explicitement, sinon l'application s'installe mais aucune requête ne part.
+- Android 9 et ultérieur bloque le trafic HTTP en clair. La configuration
+  `network_security_config.xml` l'autorise pour les seuls hôtes de développement
+  (`192.168.1.220`, `10.0.2.2`, `localhost`) ; tout autre hôte reste en TLS obligatoire.
+
+L'APK produit est signé avec la clé de debug, faute de configuration de signature de release :
+il s'installe pour tester, mais n'est pas distribuable.
+
 ### Tests
 
 ```bash
 cd backend  && ./mvnw verify   # 78 tests
 cd frontend && npm test        # 45 tests
+cd mobile   && flutter test    # 6 tests
 ```
 
 Backend : unitaires sur le calcul des périodes et la rotation des jetons, intégration sur les
@@ -86,6 +130,9 @@ endpoints avec base H2 en mémoire.
 Frontend : fonctions pures uniquement — correspondance des quadrants, mathématiques des
 graphiques sur leurs cas dégénérés, analyse des dates. Voir « Ce qui est testé, et pourquoi si
 peu » plus bas.
+Mobile : correspondance des quadrants et analyse des dates. S'y ajoute un parcours d'intégration
+(`flutter test integration_test/`) qui exige un backend accessible, et reste donc hors de la
+commande ci-dessus.
 
 ## Variables d'environnement
 
